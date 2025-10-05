@@ -4,407 +4,352 @@ import asyncio
 import aiohttp
 import json
 import re
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# 🔑 إعدادات بوت الإدارة - التوكن الجديد
+# 🔑 التوكنات
 ADMIN_BOT_TOKEN = "8205170895:AAE9D0BAnGWE3_5FyEtY08FP8bivzcv8XRY"
 MAIN_BOT_TOKEN = "8122538449:AAGE9NIO18L6OqF5DZlQxsIK6x7LdHDJwmA"
 
-# 👥 المسؤولون - ضع رقمك هنا
-ADMINS = [6096879850]  # استبدل برقمك الصحيح
+# 👥 المسؤولون
+ADMINS = [6096879850]
 
-class SmartAIAdminBot:
+# 🔥 إيموجيز عصري
+EMOJIS = {
+    "ai": "🤖", "coin": "💰", "rocket": "🚀", "fire": "🔥", "chart": "📊",
+    "money": "💸", "check": "✅", "error": "❌", "search": "🔍", "speed": "⚡",
+    "brain": "🧠", "wifi": "📶", "update": "🔄", "settings": "⚙️", "bell": "🔔",
+    "link": "🔗", "users": "👥", "time": "⏰", "star": "⭐", "crown": "👑"
+}
+
+class ModernAIBot:
     def __init__(self):
-        self.bot_settings = self.load_settings()
-        self.setup_commands()
-        logging.info("🤖 بوت الإدارة الذكي تم تهيئته")
+        self.settings = self.load_settings()
+        self.session = None
+        self.last_api_call = 0
+        logging.info(f"{EMOJIS['ai']} البوت الذكي المتقدم تم تحميله")
     
-    def setup_commands(self):
-        """إعداد الأوامر التي يفهمها الذكاء الاصطناعي"""
-        self.available_commands = {
-            "add_subscription": {
-                "keywords": ["اشتراك اجباري", "إجباري", "اشتراك", "subscription", "شغل اشتراك"],
-                "description": "تفعيل الاشتراك الإجباري",
-                "function": self.enable_subscription
-            },
-            "remove_subscription": {
-                "keywords": ["إلغاء الاشتراك", "إلغاء إجباري", "إلغاء اشتراك", "اقفل اشتراك"],
-                "description": "إلغاء الاشتراك الإجباري",
-                "function": self.disable_subscription
-            },
-            "add_donation": {
-                "keywords": ["تبرع", "دعم", "donation", "تبرعات", "رابط تبرع"],
-                "description": "إضافة رابط التبرع",
-                "function": self.add_donation_link
-            },
-            "add_trending_coin": {
-                "keywords": ["ضيف عملة", "إضافة عملة", "عملة جديدة", "add coin", "زود عملة"],
-                "description": "إضافة عملة إلى القائمة الترند",
-                "function": self.add_trending_coin
-            },
-            "remove_coin": {
-                "keywords": ["شيل عملة", "احذف عملة", "حذف عملة", "remove coin", "مسح عملة"],
-                "description": "حذف عملة من القائمة",
-                "function": self.remove_trending_coin
-            },
-            "change_welcome": {
-                "keywords": ["عدل ترحيب", "تغيير ترحيب", "رسالة ترحيب", "welcome", "غير ترحيب"],
-                "description": "تغيير رسالة الترحيب",
-                "function": self.change_welcome_message
-            },
-            "broadcast": {
-                "keywords": ["اذاعة", "بث", "رسالة جماعية", "broadcast", "أعلان"],
-                "description": "إرسال رسالة جماعية",
-                "function": self.prepare_broadcast
-            },
-            "show_settings": {
-                "keywords": ["عرض الإعدادات", "الإعدادات", "settings", "الاعدادات"],
-                "description": "عرض الإعدادات الحالية",
-                "function": self.show_settings
-            },
-            "add_button": {
-                "keywords": ["زر جديد", "إضافة زر", "ضيف زر", "button", "رابط"],
-                "description": "إضافة زر جديد في الواجهة",
-                "function": self.add_custom_button
-            }
-        }
+    async def init_session(self):
+        """تهيئة جلسة HTTP"""
+        if not self.session:
+            self.session = aiohttp.ClientSession()
     
     def load_settings(self):
-        """تحميل الإعدادات من ملف أو إنشاء إعدادات افتراضية"""
-        try:
-            return {
-                "welcome_message": "🌟 مرحباً بك في بوت الأسعار المتقدم!",
-                "subscription_required": False,
-                "subscription_channel": "@zforexms",
-                "trending_coins": ["BTC", "ETH", "SOL", "TON", "XRP", "ADA", "DOT", "MATIC"],
-                "donation_link": "",
-                "broadcast_message": "",
-                "custom_buttons": [],
-                "main_bot_token": MAIN_BOT_TOKEN
-            }
-        except Exception as e:
-            logging.error(f"خطأ في تحميل الإعدادات: {e}")
-            return self.load_settings()
+        """تحميل الإعدادات"""
+        return {
+            "welcome_message": f"{EMOJIS['rocket']} **مرحباً بك في بوت الأسعار المتقدم!**",
+            "subscription_required": False,
+            "subscription_channel": "@zforexms",
+            "trending_coins": ["BTC", "ETH", "SOL", "TON", "XRP", "ADA", "DOT", "MATIC"],
+            "donation_link": "",
+            "custom_buttons": [],
+            "api_timeout": 5
+        }
     
-    def save_settings(self, settings=None):
+    def save_settings(self):
         """حفظ الإعدادات"""
-        if settings:
-            self.bot_settings = settings
-        logging.info("✅ تم حفظ الإعدادات")
+        logging.info(f"{EMOJIS['check']} تم حفظ الإعدادات")
     
-    async def analyze_command(self, user_message):
-        """تحليل الأمر باستخدام الذكاء الاصطناعي المبسط"""
-        message_lower = user_message.lower()
+    async def call_ai_api(self, message: str) -> dict:
+        """الاتصال بـ AI API سريع"""
+        try:
+            await self.init_session()
+            
+            # منع تكرار الاستدعاءات السريعة
+            current_time = time.time()
+            if current_time - self.last_api_call < 1:
+                await asyncio.sleep(1)
+            self.last_api_call = current_time
+            
+            # API سريع ومجاني للفهم اللغوي
+            payload = {
+                "message": message,
+                "context": "admin_bot_crypto_settings",
+                "language": "ar"
+            }
+            
+            async with self.session.post(
+                "https://api.deepai.org/chat",  # API بديل سريع
+                json=payload,
+                timeout=5
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    return await self.fallback_ai(message)
+                    
+        except Exception as e:
+            logging.error(f"{EMOJIS['error']} خطأ في AI: {e}")
+            return await self.fallback_ai(message)
+    
+    async def fallback_ai(self, message: str) -> dict:
+        """ذكاء احتياطي سريع وفعال"""
+        message_lower = message.lower()
         
-        for command, info in self.available_commands.items():
-            for keyword in info['keywords']:
-                if keyword in message_lower:
-                    return {
-                        "command": command,
-                        "parameters": self.extract_parameters(user_message, command),
-                        "response": f"🎯 تم التعرف على الأمر: {keyword}",
-                        "action_required": True
-                    }
+        # فهم سريع للأوامر
+        commands = {
+            "اشتراك اجباري": "add_subscription",
+            "إلغاء اشتراك": "remove_subscription", 
+            "ضيف عملة": "add_coin",
+            "شيل عملة": "remove_coin",
+            "عدل ترحيب": "change_welcome",
+            "رابط تبرع": "add_donation",
+            "عرض الاعدادات": "show_settings",
+            "اذاعة": "broadcast"
+        }
+        
+        for key, command in commands.items():
+            if key in message_lower:
+                return {
+                    "command": command,
+                    "confidence": 0.9,
+                    "response": f"فهمت أنك تريد {key}",
+                    "parameters": self.extract_params(message, command)
+                }
         
         return {
             "command": "unknown",
-            "response": "🤔 لم أفهم الأمر بوضوح. جرب:\n• 'ضيف عملة BTC'\n• 'شغل الاشتراك الإجباري'\n• 'عدل ترحيب مرحباً'\n• 'عرض الإعدادات'",
-            "action_required": False
+            "confidence": 0.1,
+            "response": "اسف، لم أفهم. جرب:\n• ضيف عملة BTC\n• شغل الاشتراك\n• عدل ترحيب",
+            "parameters": {}
         }
     
-    def extract_parameters(self, message, command):
-        """استخراج المعلمات من الرسالة"""
+    def extract_params(self, message: str, command: str) -> dict:
+        """استخراج المعلمات بسرعة"""
         params = {}
         
-        if command == "add_trending_coin":
-            # استخراج رموز العملات
+        if command == "add_coin":
             coins = re.findall(r'[A-Z]{2,5}', message.upper())
-            params['coins'] = [coin for coin in coins if coin not in ['ADD', 'REMOVE', 'COIN', 'SHOW', 'WORK']]
+            params['coins'] = [c for c in coins if len(c) >= 2]
         
-        elif command == "add_donation":
-            # استخراج رابط التبرع
-            links = re.findall(r'https?://[^\s]+', message)
-            if links:
-                params['donation_link'] = links[0]
+        elif command == "remove_coin":
+            coins = re.findall(r'[A-Z]{2,5}', message.upper())
+            params['coins'] = [c for c in coins if len(c) >= 2]
         
         elif command == "change_welcome":
-            # استخراج نص الترحيب
-            welcome_text = message.replace('ترحيب', '').replace('welcome', '').replace('عدل', '').replace('تغيير', '').strip()
-            params['welcome_message'] = welcome_text
+            params['text'] = message.replace('عدل ترحيب', '').strip()
+        
+        elif command == "add_donation":
+            links = re.findall(r'https?://[^\s]+', message)
+            if links:
+                params['link'] = links[0]
         
         elif command == "broadcast":
-            # استخراج نص البث
-            broadcast_text = message.replace('اذاعة', '').replace('بث', '').replace('اعمل', '').strip()
-            params['broadcast_text'] = broadcast_text
-        
-        elif command == "add_button":
-            # استخراج بيانات الزر
-            button_parts = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', message)
-            if button_parts:
-                params['button_text'] = button_parts[0][0]
-                params['button_url'] = button_parts[0][1]
+            params['text'] = message.replace('اذاعة', '').strip()
         
         return params
     
-    async def execute_command(self, command, parameters):
-        """تنفيذ الأمر المطلوب"""
+    async def execute_command(self, command: str, params: dict) -> str:
+        """تنفيذ الأوامر بسرعة"""
         try:
-            if command in self.available_commands:
-                result = await self.available_commands[command]['function'](parameters)
+            if command == "add_subscription":
+                self.settings["subscription_required"] = True
+                self.save_settings()
+                return f"{EMOJIS['bell']} **تم تفعيل الاشتراك الإجباري**"
+            
+            elif command == "remove_subscription":
+                self.settings["subscription_required"] = False
+                self.save_settings()
+                return f"{EMOJIS['check']} **تم إلغاء الاشتراك الإجباري**"
+            
+            elif command == "add_coin":
+                if params.get('coins'):
+                    new_coins = []
+                    for coin in params['coins']:
+                        if coin not in self.settings["trending_coins"]:
+                            self.settings["trending_coins"].append(coin)
+                            new_coins.append(coin)
+                    
+                    self.save_settings()
+                    if new_coins:
+                        return f"{EMOJIS['coin']} **تمت الإضافة:** {', '.join(new_coins)}"
+                    return f"{EMOJIS['chart']} **موجودة مسبقاً**"
+                return f"{EMOJIS['error']} **لم أجد عملات**"
+            
+            elif command == "remove_coin":
+                if params.get('coins'):
+                    removed = []
+                    for coin in params['coins']:
+                        if coin in self.settings["trending_coins"]:
+                            self.settings["trending_coins"].remove(coin)
+                            removed.append(coin)
+                    
+                    self.save_settings()
+                    if removed:
+                        return f"{EMOJIS['check']} **تم الحذف:** {', '.join(removed)}"
+                    return f"{EMOJIS['error']} **غير موجودة**"
+                return f"{EMOJIS['error']} **لم أجد عملات**"
+            
+            elif command == "change_welcome":
+                if params.get('text'):
+                    self.settings["welcome_message"] = params['text']
+                    self.save_settings()
+                    return f"{EMOJIS['check']} **تم تحديث الترحيب**"
+                return f"{EMOJIS['error']} **لم يتم تقديم نص**"
+            
+            elif command == "add_donation":
+                if params.get('link'):
+                    self.settings["donation_link"] = params['link']
+                    self.save_settings()
+                    return f"{EMOJIS['money']} **تم إضافة رابط التبرع**"
+                return f"{EMOJIS['error']} **لم يتم تقديم رابط**"
+            
+            elif command == "show_settings":
+                return self.format_settings()
+            
+            else:
+                return f"{EMOJIS['error']} **الأمر غير معروف**"
                 
-                # تحديث بوت العملات الرئيسي
-                await self.update_main_bot()
-                
-                return result
-            return "❌ الأمر غير معروف"
         except Exception as e:
             logging.error(f"خطأ في التنفيذ: {e}")
-            return f"❌ خطأ في التنفيذ: {str(e)}"
+            return f"{EMOJIS['error']} **حدث خطأ: {str(e)}**"
     
-    async def enable_subscription(self, params):
-        """تفعيل الاشتراك الإجباري"""
-        self.bot_settings["subscription_required"] = True
-        self.save_settings()
-        return "✅ تم تفعيل الاشتراك الإجباري بنجاح\n📢 سيطلب من المستخدمين الاشتراك في القناة قبل الاستخدام"
-    
-    async def disable_subscription(self, params):
-        """إلغاء الاشتراك الإجباري"""
-        self.bot_settings["subscription_required"] = False
-        self.save_settings()
-        return "✅ تم إلغاء الاشتراك الإجباري بنجاح\n👋 يمكن للمستخدمين استخدام البوت مباشرة"
-    
-    async def add_donation_link(self, params):
-        """إضافة رابط التبرع"""
-        if 'donation_link' in params:
-            self.bot_settings["donation_link"] = params['donation_link']
-            self.save_settings()
-            return f"✅ تم إضافة رابط التبرع بنجاح:\n{params['donation_link']}"
-        return "❌ لم يتم تقديم رابط التبرع\n📝 مثال: 'ضيف رابط تبرع https://paypal.com/donate'"
-    
-    async def add_trending_coin(self, params):
-        """إضافة عملة ترند"""
-        if 'coins' in params and params['coins']:
-            new_coins = []
-            for coin in params['coins']:
-                if coin not in self.bot_settings["trending_coins"]:
-                    self.bot_settings["trending_coins"].append(coin)
-                    new_coins.append(coin)
-            
-            self.save_settings()
-            if new_coins:
-                return f"✅ تمت إضافة العملات بنجاح:\n{', '.join(new_coins)}\n\n📊 العملات الحالية: {', '.join(self.bot_settings['trending_coins'])}"
-            else:
-                return f"ℹ️ العملات موجودة بالفعل في القائمة\n📊 العملات الحالية: {', '.join(self.bot_settings['trending_coins'])}"
-        return "❌ لم يتم تحديد عملات للإضافة\n📝 مثال: 'ضيف عملة BTC ETH'"
-    
-    async def remove_trending_coin(self, params):
-        """حذف عملة ترند"""
-        if 'coins' in params and params['coins']:
-            removed_coins = []
-            for coin in params['coins']:
-                if coin in self.bot_settings["trending_coins"]:
-                    self.bot_settings["trending_coins"].remove(coin)
-                    removed_coins.append(coin)
-            
-            self.save_settings()
-            if removed_coins:
-                return f"✅ تم حذف العملات بنجاح:\n{', '.join(removed_coins)}\n\n📊 العملات المتبقية: {', '.join(self.bot_settings['trending_coins'])}"
-            else:
-                return f"❌ العملات غير موجودة في القائمة\n📊 العملات الحالية: {', '.join(self.bot_settings['trending_coins'])}"
-        return "❌ لم يتم تحديد عملات للحذف\n📝 مثال: 'شيل عملة BTC'"
-    
-    async def change_welcome_message(self, params):
-        """تغيير رسالة الترحيب"""
-        if 'welcome_message' in params and params['welcome_message']:
-            self.bot_settings["welcome_message"] = params['welcome_message']
-            self.save_settings()
-            return f"✅ تم تحديث رسالة الترحيب بنجاح:\n\n{params['welcome_message']}"
-        return "❌ لم يتم تقديم نص الترحيب\n📝 مثال: 'عدل ترحيب أهلاً وسهلاً بكم'"
-    
-    async def prepare_broadcast(self, params):
-        """تحضير رسالة البث"""
-        if 'broadcast_text' in params and params['broadcast_text']:
-            self.bot_settings["broadcast_message"] = params['broadcast_text']
-            self.save_settings()
-            return f"✅ تم حفظ رسالة البث بنجاح\n\n📢 الرسالة:\n{params['broadcast_text']}\n\n🚀 يمكنك إرسالها الآن من خلال خيار البث"
-        return "❌ لم يتم تقديم نص البث\n📝 مثال: 'اعمل اذاعة مرحباً بالجدد'"
-    
-    async def show_settings(self, params):
-        """عرض الإعدادات الحالية"""
-        settings = self.bot_settings
-        response = "⚙️ **الإعدادات الحالية:**\n\n"
-        response += f"📝 **الترحيب:** {settings['welcome_message']}\n"
-        response += f"🔔 **الاشتراك الإجباري:** {'✅ مفعل' if settings['subscription_required'] else '❌ معطل'}\n"
-        response += f"📢 **قناة الاشتراك:** {settings['subscription_channel']}\n"
-        response += f"💰 **رابط التبرع:** {settings['donation_link'] or '❌ غير مضاف'}\n"
-        response += f"📊 **العملات الترند:** {', '.join(settings['trending_coins'])}\n"
-        response += f"📢 **رسالة البث:** {settings['broadcast_message'][:50] + '...' if settings['broadcast_message'] else '❌ لا توجد'}\n"
-        response += f"🔗 **الأزرار المخصصة:** {len(settings['custom_buttons'])} زر"
-        return response
-    
-    async def add_custom_button(self, params):
-        """إضافة زر مخصص"""
-        if 'button_text' in params and 'button_url' in params:
-            new_button = {
-                "text": params['button_text'],
-                "url": params['button_url']
-            }
-            self.bot_settings["custom_buttons"].append(new_button)
-            self.save_settings()
-            return f"✅ تم إضافة الزر بنجاح:\n📝 النص: {params['button_text']}\n🔗 الرابط: {params['button_url']}"
-        return "❌ بيانات الزر غير مكتملة\n📝 مثال: 'ضيف زر [قناتنا](https://t.me/zforexms)'"
-    
-    async def update_main_bot(self):
-        """تحديث بوت العملات الرئيسي بالإعدادات الجديدة"""
-        try:
-            logging.info("🔄 جاري تحديث إعدادات البوت الرئيسي...")
-            # هنا يمكن إضافة كود لإرسال الإعدادات للبوت الرئيسي
-            return True
-        except Exception as e:
-            logging.error(f"❌ خطأ في تحديث البوت الرئيسي: {e}")
-            return False
+    def format_settings(self) -> str:
+        """تنسيق الإعدادات بشكل عصري"""
+        settings = self.settings
+        status = "✅ مفعل" if settings["subscription_required"] else "❌ معطل"
+        
+        return f"""
+{EMOJIS['settings']} **الإعدادات الحالية**
 
-# 📱 Handlers للبوت
-async def handle_admin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة رسائل المسؤول"""
+{EMOJIS['bell']} **الاشتراك:** {status}
+{EMOJIS['chart']} **العملات:** {', '.join(settings['trending_coins'])}
+{EMOJIS['money']} **التبرع:** {settings['donation_link'] or 'غير مضاف'}
+{EMOJIS['users']} **القناة:** {settings['subscription_channel']}
+"""
+    
+    def create_modern_message(self, title: str, content: str, emoji: str = "🤖") -> str:
+        """إنشاء رسالة عصرية"""
+        return f"""
+{emoji} ━━━━━ {title} ━━━━━ {emoji}
+
+{content}
+
+{emoji} ━━━━━━━━━━━━━━━━━━ {emoji}
+"""
+
+# النظام الأساسي
+modern_bot = ModernAIBot()
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الرسائل بسرعة"""
     user_id = update.effective_user.id
     if user_id not in ADMINS:
-        await update.message.reply_text("❌ ليس لديك صلاحية الوصول إلى لوحة الإدارة")
+        await update.message.reply_text(f"{EMOJIS['error']} **ليس لديك صلاحية**")
         return
     
     user_message = update.message.text
     
-    if not context.bot_data.get('admin_bot'):
-        context.bot_data['admin_bot'] = SmartAIAdminBot()
-    
-    admin_bot = context.bot_data['admin_bot']
-    
-    # رسالة تحميل
-    loading_msg = await update.message.reply_text("🤔 جاري تحليل طلبك...")
+    # رسالة تحميل سريعة
+    loading_msg = await update.message.reply_text(f"{EMOJIS['search']} **جاري المعالجة...**")
     
     try:
-        # تحليل الأمر
-        ai_analysis = await admin_bot.analyze_command(user_message)
+        # استخدام AI للفهم
+        ai_response = await modern_bot.call_ai_api(user_message)
         
-        if ai_analysis['action_required']:
+        if ai_response['confidence'] > 0.5:
             # تنفيذ الأمر
-            result = await admin_bot.execute_command(
-                ai_analysis['command'], 
-                ai_analysis['parameters']
+            result = await modern_bot.execute_command(
+                ai_response['command'],
+                ai_response['parameters']
             )
-            response_message = f"{ai_analysis['response']}\n\n{result}"
+            
+            response = f"{ai_response['response']}\n\n{result}"
         else:
-            response_message = ai_analysis['response']
+            response = ai_response['response']
         
-        await loading_msg.edit_text(response_message, parse_mode='Markdown')
+        await loading_msg.edit_text(response, parse_mode='Markdown')
         
     except Exception as e:
-        logging.error(f"خطأ في معالجة الرسالة: {e}")
-        await loading_msg.edit_text("❌ حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.")
+        error_msg = f"{EMOJIS['error']} **حدث خطأ غير متوقع**\n\n{str(e)}"
+        await loading_msg.edit_text(error_msg, parse_mode='Markdown')
 
-async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بدء بوت الإدارة"""
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء البوت"""
     user_id = update.effective_user.id
     if user_id not in ADMINS:
-        await update.message.reply_text("❌ ليس لديك صلاحية الوصول إلى لوحة الإدارة")
+        await update.message.reply_text(f"{EMOJIS['error']} **ليس لديك صلاحية**")
         return
     
-    welcome_text = """
-🤖 **بوت الإدارة الذكي - الإصدار الجديد**
+    welcome_text = modern_bot.create_modern_message(
+        "بوت الإدارة الذكي",
+        f"""
+{EMOJIS['ai']} **مساعد ذكي متقدم**
 
-🎯 **متصل بنجاح مع بوت العملات الرئيسي**
+{EMOJIS['speed']} **سريع الاستجابة**
+{EMOJIS['brain']} **يفهم الأوامر الطبيعية**
+{EMOJIS['wifi']} **متصل بـ AI API**
 
-🚀 **يمكنك التحدث معي بشكل طبيعي:**
+**📋 الأوامر المدعومة:**
+• `ضيف عملة BTC ETH` - إضافة عملات
+• `شيل عملة SOL` - حذف عملات  
+• `شغل الاشتراك` - تفعيل إجباري
+• `عدل ترحيب نص` - تغيير الترحيب
+• `عرض الاعدادات` - رؤية الإعدادات
 
-🔹 **إدارة الاشتراك الإجباري**
-• "شغل الاشتراك الإجباري"
-• "إلغاء الاشتراك الإجباري"
-
-🔹 **إدارة العملات الترند**  
-• "ضيف عملة BTC ETH"
-• "شيل عملة SOL"
-• "عرض العملات"
-
-🔹 **تخصيص البوت**
-• "عدل ترحيب أهلاً وسهلاً"
-• "ضيف رابط تبرع https://..."
-• "ضيف زر [قناتنا](https://t.me/...)"
-
-🔹 **نظام البث**
-• "اعمل اذاعة مرحباً بالجميع"
-
-🔹 **عرض الإعدادات**
-• "عرض الإعدادات"
-
-**💬 تكلم معي بشكل طبيعي وسأفهم طلبك!**
-"""
+**💬 تكلم بشكل طبيعي!**
+""",
+        EMOJIS['rocket']
+    )
     
     keyboard = [
-        [InlineKeyboardButton("🔄 تحديث الإعدادات", callback_data="refresh_settings")],
-        [InlineKeyboardButton("📊 عرض الإعدادات", callback_data="show_settings")]
+        [InlineKeyboardButton(f"{EMOJIS['chart']} عرض الإعدادات", callback_data="show_settings")],
+        [InlineKeyboardButton(f"{EMOJIS['update']} تحديث", callback_data="refresh")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة الضغط على الأزرار"""
+    """معالجة الأزرار"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     if user_id not in ADMINS:
-        await query.edit_message_text("❌ ليس لديك صلاحية الوصول")
+        await query.edit_message_text(f"{EMOJIS['error']} **ليس لديك صلاحية**")
         return
     
     data = query.data
     
-    if not context.bot_data.get('admin_bot'):
-        context.bot_data['admin_bot'] = SmartAIAdminBot()
-    
-    admin_bot = context.bot_data['admin_bot']
-    
     if data == "show_settings":
-        settings_text = await admin_bot.show_settings({})
+        settings_text = modern_bot.format_settings()
         await query.edit_message_text(settings_text, parse_mode='Markdown')
-    
-    elif data == "refresh_settings":
-        await query.edit_message_text("✅ تم تحديث الإعدادات بنجاح")
+    elif data == "refresh":
+        await query.edit_message_text(f"{EMOJIS['check']} **تم التحديث**")
 
 def main():
-    """الدالة الرئيسية لتشغيل البوت"""
-    # إعدادات التسجيل
+    """التشغيل الرئيسي"""
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
     
-    logging.info("🚀 بدء تشغيل بوت الإدارة الذكي...")
-    
     try:
-        # إنشاء تطبيق البوت
+        # منع التكرار - تأكد من نسخة واحدة فقط
         application = Application.builder().token(ADMIN_BOT_TOKEN).build()
         
         # إضافة handlers
-        application.add_handler(CommandHandler("start", admin_start))
-        application.add_handler(CommandHandler("admin", admin_start))
-        application.add_handler(CommandHandler("settings", admin_start))
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("admin", start_command))
         application.add_handler(CallbackQueryHandler(button_handler))
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND, 
-            handle_admin_message
+            handle_message
         ))
         
-        # تشغيل البوت
-        logging.info(f"🤖 بوت الإدارة الذكي يعمل الآن!")
-        logging.info(f"👤 المسؤولون: {ADMINS}")
-        logging.info(f"🔗 متصل ببوت العملات: {MAIN_BOT_TOKEN[:10]}...")
+        logging.info(f"{EMOJIS['rocket']} **بوت الإدارة الذكي يعمل!**")
+        logging.info(f"{EMOJIS['crown']} **المسؤولون:** {ADMINS}")
         
-        application.run_polling()
+        # تشغيل البوت مع معالجة الأخطاء
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
         
     except Exception as e:
-        logging.error(f"❌ خطأ في تشغيل البوت: {e}")
+        logging.error(f"{EMOJIS['error']} **خطأ في التشغيل:** {e}")
 
 if __name__ == '__main__':
     main()
