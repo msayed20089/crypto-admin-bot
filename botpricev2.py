@@ -14,7 +14,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-BOT_TOKEN = "7097772026:AAFWFBSY38DjSYj3MGatXswfS9XjSqHceso"
+BOT_TOKEN = "8122538449:AAGE9NIO18L6OqF5DZlQxsIK6x7LdHDJwmA"
 CHANNEL_LINK = "https://t.me/zforexms"
 
 # خطوط إموجيز للتصميم العصري
@@ -504,4 +504,5 @@ def main():
     application.run_polling()
 
 if __name__ == '__main__':
+
     main()
