@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python admin_bot.py"
+
+[[services]]
+name = "admin-bot"
+type = "web"
