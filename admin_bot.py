@@ -7,8 +7,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # إعدادات بوت الإدارة - ضع التوكن الذي حصلت عليه هنا
-ADMIN_BOT_TOKEN = "8122538449:AAGE9NIO18L6OqF5DZlQxsIK6x7LdHDJwmA"
-MAIN_BOT_TOKEN = "7097772026:AAFWFBSY38DjSYj3MGatXswfS9XjSqHceso"
+ADMIN_BOT_TOKEN = "8205170895:AAE9D0BAnGWE3_5FyEtY08FP8bivzcv8XRY"
+MAIN_BOT_TOKEN = "8122538449:AAGE9NIO18L6OqF5DZlQxsIK6x7LdHDJwmA"
 
 # ضع رقمك كمسؤول (اسألني كيف تعرف رقمك على Telegram)
 ADMINS = [123456789]  # استبدل هذا برقمك
@@ -252,4 +252,5 @@ def main():
     application.run_polling()
 
 if __name__ == '__main__':
+
     main()
