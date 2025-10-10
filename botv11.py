@@ -1,4 +1,4 @@
-# === bot_railway.py ===
+# === bot_railway_fixed.py ===
 import os
 import telebot
 import requests
@@ -12,6 +12,7 @@ import matplotlib
 import matplotlib.patches as patches
 import re
 import time
+from flask import Flask, request
 
 # إعدادات matplotlib
 matplotlib.use('Agg')
@@ -19,7 +20,7 @@ plt.style.use('dark_background')
 
 # 🔑 توكن البوت من متغيرات البيئة
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '7097772026:AAFWFBSY38DjSYj3MGatXswfS9XjSqHceso')
-bot = telebot.TeleBot(API_TOKEN, threaded=True)
+bot = telebot.TeleBot(API_TOKEN)
 
 # 🔗 رابط القناة
 CHANNEL_LINK = '@zforexms'
@@ -33,6 +34,9 @@ request_session.headers.update({
 # إعدادات Railway
 WEBHOOK_URL = os.environ.get('RAILWAY_STATIC_URL')
 PORT = int(os.environ.get('PORT', 5000))
+
+# تطبيق Flask
+app = Flask(__name__)
 
 class SimpleCryptoAnalyzer:
     def __init__(self):
@@ -101,6 +105,7 @@ class SimpleCryptoAnalyzer:
     def get_coingecko_price(self, coin_symbol):
         """جلب السعر من CoinGecko"""
         try:
+            # محاولة مباشرة أولاً
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_symbol.lower()}&vs_currencies=usd&include_24hr_change=true"
             response = request_session.get(url, timeout=5)
             if response.status_code == 200:
@@ -115,22 +120,7 @@ class SimpleCryptoAnalyzer:
         except:
             pass
         
-        # محاولة البحث العام
-        try:
-            url = f"https://api.coingecko.com/api/v3/search?query={coin_symbol}"
-            response = request_session.get(url, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                coins = data.get('coins', [])
-                if coins:
-                    coin = coins[0]
-                    return {
-                        'current_price': coin.get('current_price', 0),
-                        'price_change_percentage_24h': coin.get('price_change_percentage_24h', 0),
-                        'api_source': 'coingecko_search'
-                    }
-        except:
-            return None
+        return None
     
     def get_historical_data(self, coin_symbol, timeframe='4h', limit=85):
         """جلب البيانات التاريخية"""
@@ -188,7 +178,7 @@ def send_welcome(message):
     
     welcome_text = f"""
 *🚀 بوت تحليل العملات - MS TRADING*
-الإصدار المبسط للـ Railway
+الإصدار النهائي للـ Railway
 
 *✨ المميزات:*
 • دعم {total_coins}+ عملة رقمية
@@ -201,19 +191,12 @@ def send_welcome(message):
 • أو اكتب الكمية والعملة مثل: `5ETH`
 • أو استخدم الأزرار أدناه
 
-*📊 العملات المدعومة:*
-BTC, ETH, BNB, XRP, ADA, DOGE, SOL, MATIC, SHIB, وغيرها
-
 🔔 *تابعنا:* {CHANNEL_LINK}
 """
     keyboard = InlineKeyboardMarkup()
     keyboard.row(
         InlineKeyboardButton("💰 العملات الشائعة", callback_data="popular"),
         InlineKeyboardButton("📚 المساعدة", callback_data="help")
-    )
-    keyboard.row(
-        InlineKeyboardButton("📊 إحصائيات", callback_data="stats"),
-        InlineKeyboardButton("🔄 تحديث", callback_data="refresh")
     )
     
     bot.send_message(message.chat.id, welcome_text, reply_markup=keyboard, parse_mode='Markdown')
@@ -415,11 +398,9 @@ def handle_callbacks(call):
             show_popular_coins(call.message)
         elif call.data == 'help':
             show_help(call.message)
-        elif call.data == 'stats':
-            show_stats(call.message)
-        elif call.data == 'refresh':
-            bot.answer_callback_query(call.id, "🔄 تم التحديث")
-            send_welcome(call.message)
+        elif call.data.startswith('coin_'):
+            coin_symbol = call.data.replace('coin_', '')
+            process_coin_request(call.message, coin_symbol)
         
         bot.answer_callback_query(call.id)
         
@@ -432,14 +413,12 @@ def show_popular_coins(message):
         ['BTC', 'ETH', 'BNB'],
         ['XRP', 'ADA', 'SOL'],
         ['DOGE', 'MATIC', 'SHIB'],
-        ['DOT', 'LTC', 'AVAX']
+        ['LTC', 'DOT', 'AVAX']
     ]
     
     keyboard = InlineKeyboardMarkup()
     for row in popular_coins:
         keyboard.row(*[InlineKeyboardButton(coin, callback_data=f"coin_{coin}") for coin in row])
-    
-    keyboard.add(InlineKeyboardButton("🔙 رجوع", callback_data="back"))
     
     text = "💰 *العملات الرقمية الشائعة*\n\nاختر عملة للتحليل:"
     bot.send_message(message.chat.id, text, reply_markup=keyboard, parse_mode='Markdown')
@@ -468,66 +447,54 @@ BTC, ETH, BNB, XRP, ADA, SOL, DOGE, MATIC, SHIB, وغيرها
 """
     bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
 
-def show_stats(message):
-    """عرض الإحصائيات"""
-    total_coins = analyzer.get_total_coins_count()
-    
-    stats_text = f"""
-📈 *إحصائيات البوت*
+# ==============================================
+# 🚀 إعدادات Webhook للـ Railway
+# ==============================================
 
-• العملات المدعومة: `{total_coins}`
-• المصادر: Binance, CoinGecko
-• السرعة: فورية
-• الاستقرار: 99.9%
+@app.route('/')
+def home():
+    return '🤖 MS TRADING BOT is Running on Railway!'
 
-🕒 *وقت التشغيل:*
-{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+@app.route('/health')
+def health():
+    return '✅ OK'
 
-🔔 {CHANNEL_LINK}
-"""
-    bot.send_message(message.chat.id, stats_text, parse_mode='Markdown')
+@app.route(f'/{API_TOKEN}', methods=['POST'])
+def webhook():
+    """معالجة webhook من Telegram"""
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return ''
+    return 'OK'
+
+def setup_webhook():
+    """إعداد webhook"""
+    if WEBHOOK_URL:
+        print(f"🌐 جاري إعداد Webhook على: {WEBHOOK_URL}")
+        try:
+            bot.remove_webhook()
+            time.sleep(1)
+            webhook_url = f"{WEBHOOK_URL}/{API_TOKEN}"
+            bot.set_webhook(url=webhook_url)
+            print(f"✅ تم إعداد Webhook بنجاح: {webhook_url}")
+        except Exception as e:
+            print(f"❌ خطأ في إعداد Webhook: {e}")
+    else:
+        print("⚠️  لم يتم تعيين WEBHOOK_URL، البوت سيعمل في وضع Polling")
 
 # ==============================================
-# 🚀 تشغيل البوت على Railway
+# 🚀 تشغيل البوت
 # ==============================================
 
 if __name__ == "__main__":
     print("🚀 بدء تشغيل البوت على Railway...")
     print(f"📊 العملات المدعومة: {analyzer.get_total_coins_count()}")
     
-    # تشغيل البوت
-    try:
-        if WEBHOOK_URL:
-            print(f"🌐 استخدام Webhook: {WEBHOOK_URL}")
-            bot.remove_webhook()
-            time.sleep(1)
-            bot.set_webhook(url=f"{WEBHOOK_URL}/{API_TOKEN}")
-            
-            # تشغيل خادم ويب بسيط
-            from flask import Flask, request
-            app = Flask(__name__)
-            
-            @app.route(f'/{API_TOKEN}', methods=['POST'])
-            def webhook():
-                if request.headers.get('content-type') == 'application/json':
-                    json_string = request.get_data().decode('utf-8')
-                    update = telebot.types.Update.de_json(json_string)
-                    bot.process_new_updates([update])
-                    return ''
-                return 'OK'
-            
-            @app.route('/')
-            def home():
-                return '🤖 MS TRADING BOT is Running on Railway!'
-            
-            @app.route('/health')
-            def health():
-                return '✅ OK'
-            
-            app.run(host='0.0.0.0', port=PORT)
-        else:
-            print("🔧 استخدام Polling mode...")
-            bot.infinity_polling()
-            
-    except Exception as e:
-        print(f"❌ خطأ في تشغيل البوت: {e}")
+    # إعداد webhook إذا كان متوفراً
+    setup_webhook()
+    
+    # تشغيل خادم Flask
+    print(f"🌐 تشغيل الخادم على المنفذ: {PORT}")
+    app.run(host='0.0.0.0', port=PORT, debug=False)
