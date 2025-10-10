@@ -1,4 +1,4 @@
-# === bot_railway_fixed.py ===
+# === bot_railway.py ===
 import os
 import telebot
 import requests
