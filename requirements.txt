@@ -226,4 +226,4 @@ netcdf4==1.6.5
 yfinance==0.2.18
 pandas-datareader==0.10.0
 ccxt==4.1.77
-ta-lib==
+
